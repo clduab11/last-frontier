@@ -7,7 +7,7 @@
 
 ## 🌟 Vision
 
-The Last Frontier represents the convergence of **unfiltered and decensored AI innovation**, all with **enterprise-grade reliability**. Put simply, it's not SIMPLY your next ChatGPT!
+The Last Frontier represents the convergence of **unfiltered and decensored AI innovation**, all with **enterprise-grade reliability**. Put simply, it's not ONLY your next ChatGPT! It's more than that, it's **unlocked knowledge**.
 
 Built for developers, scientists, researchers, and creative artists who refuse to compromise between cutting-edge AI capabilities, black-box prompt filters and sanitized content...with production-ready infrastructure, this platform empowers you to:
 
