@@ -7,7 +7,7 @@
 
 ## 🌟 Vision
 
-The Last Frontier represents the convergence of **unfiltered AI innovation** and **enterprise-grade reliability**. Built for developers who refuse to compromise between cutting-edge AI capabilities and production-ready infrastructure, this platform empowers you to:
+The Last Frontier represents the convergence of **unfiltered and decensored AI innovation**, all with **enterprise-grade reliability**. Built for developers, scientists, researchers, and creative artists who refuse to compromise between cutting-edge AI capabilities, black-box prompt filters and sanitized content...with production-ready infrastructure, this platform empowers you to:
 
 - **Break Through AI Limitations** - Deploy sophisticated AI models without traditional constraints
 - **Scale Without Boundaries** - Handle enterprise workloads with confidence
@@ -47,6 +47,9 @@ Rapidly prototype and deploy AI-powered features without infrastructure overhead
 
 ### Technology Leaders
 Make strategic decisions with comprehensive analytics and performance insights.
+
+### Creative Artists
+Imaginative minds whose creativity cannot be hampered by filters and censors.
 
 ## 🚀 Quick Start
 
