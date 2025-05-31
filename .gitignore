@@ -15,9 +15,12 @@ build/
 .env.test.local
 .env.production.local
 
-# Test coverage
+# Test coverage and reports
 coverage/
 *.lcov
+lcov-report/
+*.coverage
+.nyc_output/
 
 # IDE and editor files
 .vscode/
@@ -25,6 +28,7 @@ coverage/
 *.swp
 *.swo
 *~
+.roo/
 
 # OS generated files
 .DS_Store
@@ -48,11 +52,10 @@ pids/
 # Temporary files
 tmp/
 temp/
+.env.test
 
-# Development archives (will be moved to docs/development-archive/)
-*sprint*_*.md
-*_pseudocode.md
-*_next_phase_*.md
+# Development and testing configs
+mcptestconfig.json
 
 # Security
 *.pem
@@ -64,3 +67,9 @@ temp/
 # Database
 *.sqlite
 *.db
+
+# Legacy/deprecated files that don't serve The Last Frontier
+docs/development-archive/
+*sprint*_*.md
+*_pseudocode.md
+*_next_phase_*.md

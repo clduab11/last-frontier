@@ -87,6 +87,7 @@ class MetricsCollector extends EventEmitter {
   private errorCount = 0;
   private requestCount = 0;
   private startTime = Date.now();
+  private metricsInterval?: NodeJS.Timeout; // Store interval reference for cleanup
   
   private readonly thresholds: AlertThresholds = {
     critical: {
@@ -361,7 +362,7 @@ class MetricsCollector extends EventEmitter {
    */
   private startMetricsCollection() {
     // Collect system metrics every 30 seconds
-    setInterval(() => {
+    this.metricsInterval = setInterval(() => {
       const metrics = this.getSystemMetrics();
       this.emit('metrics_collected', metrics);
       
@@ -370,6 +371,19 @@ class MetricsCollector extends EventEmitter {
         this.requestTimes = this.requestTimes.slice(-1000);
       }
     }, 30000);
+  }
+
+  /**
+   * Stop metrics collection and cleanup resources
+   */
+  public cleanup(): void {
+    if (this.metricsInterval) {
+      clearInterval(this.metricsInterval);
+      this.metricsInterval = undefined;
+    }
+    this.removeAllListeners();
+    this.metrics.clear();
+    this.requestTimes = [];
   }
 
   /**

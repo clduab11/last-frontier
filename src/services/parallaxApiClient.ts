@@ -1,7 +1,11 @@
 // Parallax Analytics API Client
 // Handles HTTP requests with retry logic, rate limiting, and VCU token authentication.
 
-import axios, { AxiosInstance, AxiosRequestConfig, AxiosResponse } from 'axios';
+/**
+ * Parallax Analytics API Client
+ * Uses direct CJS require to avoid ESM/CJS interop issues with axios in Jest/TS.
+ */
+import type { AxiosInstance, AxiosRequestConfig, AxiosResponse } from 'axios';
 import Bottleneck from 'bottleneck';
 import { parallaxConfig } from '../config/parallaxConfig';
 import { getActiveVcuToken } from './vcuTokenService';
@@ -10,6 +14,11 @@ import {
   ParallaxApiResponse,
   ParallaxApiErrorResponse,
 } from '../types/parallax';
+
+
+
+const axiosInstance = require('axios');
+
 
 /**
  * Rate limiter to control API request frequency.
@@ -22,7 +31,7 @@ const limiter = new Bottleneck({
 /**
  * Axios instance configured for Parallax API.
  */
-const apiClient: AxiosInstance = axios.create({
+const apiClient: AxiosInstance = axiosInstance.create({
   baseURL: parallaxConfig.apiBaseUrl,
   timeout: parallaxConfig.timeoutMs,
 });
@@ -39,12 +48,16 @@ async function requestWithRetry<T>(
   for (let attempt = 0; attempt <= retries; attempt++) {
     try {
       return await limiter.schedule(() => apiClient.request<T>(config));
-    } catch (error: any) {
+    } catch (error: unknown) {
       lastError = error;
       // Retry on network or 5xx errors
       if (
         attempt < retries &&
+        typeof error === 'object' &&
+        error !== null &&
+        // @ts-expect-error: dynamic error shape
         (error.code === 'ECONNABORTED' ||
+          // @ts-expect-error: dynamic error shape
           (error.response && error.response.status >= 500))
       ) {
         await new Promise((res) => setTimeout(res, retryDelay));
@@ -64,9 +77,9 @@ async function requestWithRetry<T>(
 export async function generateContent(
   payload: ParallaxContentGenerationRequest
 ): Promise<ParallaxApiResponse> {
-  // Obtain VCU token for authentication
-  const vcuToken = await getActiveVcuToken();
   try {
+    // Obtain VCU token for authentication
+    const vcuToken = await getActiveVcuToken();
     const response = await requestWithRetry<ParallaxApiResponse>({
       method: 'POST',
       url: parallaxConfig.contentEndpoint,
@@ -77,16 +90,33 @@ export async function generateContent(
       data: payload,
     });
     return response.data;
-  } catch (error: any) {
+  } catch (error: unknown) {
     // Standardize error response
+    let code = 'API_ERROR';
+    let message = 'Unknown error';
+    let details;
+    let status;
+    let requestId;
+    if (typeof error === 'object' && error !== null) {
+      // @ts-expect-error: dynamic error shape
+      code = error?.response?.data?.error?.code || code;
+      // @ts-expect-error: dynamic error shape
+      message = error?.response?.data?.error?.message || error?.message || message;
+      // @ts-expect-error: dynamic error shape
+      details = error?.response?.data?.error?.details;
+      // @ts-expect-error: dynamic error shape
+      status = error?.response?.status;
+      // @ts-expect-error: dynamic error shape
+      requestId = error?.response?.data?.requestId;
+    }
     const apiError: ParallaxApiErrorResponse = {
       error: {
-        code: error?.response?.data?.error?.code || 'API_ERROR',
-        message: error?.response?.data?.error?.message || error.message || 'Unknown error',
-        details: error?.response?.data?.error?.details,
-        status: error?.response?.status,
+        code,
+        message,
+        details,
+        status,
       },
-      requestId: error?.response?.data?.requestId,
+      requestId,
     };
     return apiError;
   }

@@ -1,32 +1,22 @@
 {
   "mcpServers": {
-    "supabase": {
-      "command": "npx",
-      "args": [
-        "-y",
-        "@supabase/mcp-server-supabase@latest",
-        "--access-token",
-        "${env:SUPABASE_ACCESS_TOKEN}"
-      ],
-      "alwaysAllow": [
-        "list_tables",
-        "execute_sql",
-        "listTables",
-        "list_projects",
-        "list_organizations",
-        "get_organization",
-        "apply_migration",
-        "get_project",
-        "execute_query",
-        "generate_typescript_types",
-        "listProjects"
-      ]
-    },
     "mem0": {
-      "url": "https://mcp.composio.dev/mem0/abandoned-creamy-horse-Y39-hm?agent=cursor"
-    },
-    "perplexityai": {
-      "url": "https://mcp.composio.dev/perplexityai/abandoned-creamy-horse-Y39-hm?agent=cursor"
+      "url": "https://mcp.composio.dev/mem0/abandoned-creamy-horse-Y39-hm?agent=cursor",
+      "disabled": false,
+      "alwaysAllow": [
+        "MEM0_GET_REQUIRED_PARAMETERS",
+        "MEM0_INITIATE_CONNECTION",
+        "MEM0_CHECK_ACTIVE_CONNECTION",
+        "MEM0_SEARCH_MEMORIES_WITH_QUERY_FILTERS",
+        "MEM0_RETRIEVE_MEMORY_BY_UNIQUE_IDENTIFIER",
+        "MEM0_PERFORM_SEMANTIC_SEARCH_ON_MEMORIES",
+        "MEM0_DELETE_MEMORIES_ENDPOINT",
+        "MEM0_CREATE_PROJECT",
+        "MEM0_CREATE_A_NEW_ORGANIZATION_ENTRY",
+        "MEM0_ADD_ORGANIZATION_MEMBER",
+        "MEM0_ADD_NEW_MEMORY_RECORDS"
+      ],
+      "timeout": 600
     }
   }
 }

@@ -19,7 +19,6 @@ import {
 import MetricsCollector from './monitoring/metricsCollector';
 import contentGenerationService from './services/contentGenerationService';
 import { ParallaxContentGenerationRequest } from './types/parallax';
-
 // Load environment variables
 dotenv.config();
 // Initialize metrics collector
@@ -27,11 +26,17 @@ const metricsCollector = new MetricsCollector('last-frontier-platform');
 
 // Setup metrics event handlers
 metricsCollector.on('alert', (alert) => {
-  console.error(`[ALERT] ${alert.level.toUpperCase()}: ${alert.type} - ${alert.value} exceeds threshold ${alert.threshold}`);
+  // Skip alerts in test environment to reduce noise
+  if (process.env.NODE_ENV !== 'test') {
+    console.error(`[ALERT] ${alert.level.toUpperCase()}: ${alert.type} - ${alert.value} exceeds threshold ${alert.threshold}`);
+  }
 });
 
 metricsCollector.on('security_alert', (alert) => {
-  console.error(`[SECURITY ALERT] ${alert.type}: ${JSON.stringify(alert.data)}`);
+  // Skip security alerts in test environment to reduce noise
+  if (process.env.NODE_ENV !== 'test') {
+    console.error(`[SECURITY ALERT] ${alert.type}: ${JSON.stringify(alert.data)}`);
+  }
 });
 
 metricsCollector.on('metrics_collected', (metrics) => {
@@ -58,6 +63,9 @@ app.use(helmet({
     maxAge: 31536000,
     includeSubDomains: true,
     preload: true
+  },
+  frameguard: {
+    action: 'deny'
   }
 }));
 
@@ -144,7 +152,19 @@ app.get('/health', async (_req: Request, res: Response): Promise<void> => {
   }
 });
 
+import { createAuthRouter } from './routes/auth';
+import ffcRoutes from './routes/ffc';
+import aiRoutes from './routes/ai';
+
 // API routes
+app.use('/api/v1/auth', createAuthRouter(metricsCollector));
+
+// FFC (Frontier Freedom Credits) routes - protected by authentication
+app.use('/api/v1/ffc', authenticateToken, ffcRoutes);
+
+// AI inference routes - protected by authentication  
+app.use('/api/v1/ai', authenticateToken, aiRoutes);
+
 app.get('/api/v1/status', (_req: Request, res: Response): void => {
   res.json({
     service: 'Last Frontier Platform',
@@ -287,27 +307,49 @@ app.use('*', (req: Request, res: Response): void => {
 // Graceful shutdown
 registerShutdown();
 
-// Start server
-const server = app.listen(PORT, (): void => {
-  // eslint-disable-next-line no-console
-  console.log(`🚀 Last Frontier server running on port ${PORT}`);
-  // eslint-disable-next-line no-console
-  console.log(`📊 Environment: ${process.env.NODE_ENV || 'development'}`);
-  // eslint-disable-next-line no-console
-  console.log(`🔒 Security middleware enabled`);
-  // eslint-disable-next-line no-console
-  console.log(`💾 Database connection pool initialized`);
-});
+let serverInstance: import('http').Server | undefined;
+
+export const startServer = (port: number = Number(PORT)): import('http').Server => {
+  if (serverInstance && serverInstance.listening) {
+    console.warn(`Server is already running on port ${PORT}.`);
+    return serverInstance;
+  }
+  serverInstance = app.listen(port, (): void => {
+    // eslint-disable-next-line no-console
+    console.log(`🚀 Last Frontier server running on port ${port}`);
+    // eslint-disable-next-line no-console
+    console.log(`📊 Environment: ${process.env.NODE_ENV || 'development'}`);
+    // eslint-disable-next-line no-console
+    console.log(`🔒 Security middleware enabled`);
+    // eslint-disable-next-line no-console
+    console.log(`💾 Database connection pool initialized`);
+  });
+  return serverInstance;
+};
+
+export const closeServer = (callback?: (err?: Error) => void): void => {
+  if (serverInstance) {
+    serverInstance.close(callback);
+    serverInstance = undefined;
+  } else {
+    if (callback) callback();
+  }
+};
 
 // Handle server shutdown
 process.on('SIGTERM', (): void => {
   // eslint-disable-next-line no-console
   console.log('SIGTERM received, shutting down gracefully');
-  server.close((): void => {
+  closeServer(() => {
     // eslint-disable-next-line no-console
     console.log('Server closed');
     process.exit(0);
   });
 });
 
-export default app;
+// Only start server automatically if not in test environment
+if (process.env.NODE_ENV !== 'test') {
+  startServer();
+}
+
+export { app, serverInstance as server, metricsCollector }; // Export app, server instance, and metrics collector

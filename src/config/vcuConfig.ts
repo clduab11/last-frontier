@@ -19,14 +19,17 @@ export class VcuConfig {
    */
   constructor() {
     // Implementation: load from process.env, validate, set defaults
-    // For now, set default options for testing
+    const tokenDefaultExpiryEnv = parseInt(process.env.TOKEN_DEFAULT_EXPIRY || '', 10);
+    const tokenDefaultQuotaEnv = parseInt(process.env.TOKEN_DEFAULT_QUOTA || '', 10);
+    const tokenDefaultRateLimitEnv = parseInt(process.env.TOKEN_DEFAULT_RATE_LIMIT || '', 10);
+
     this.options = {
-      redisUrl: process.env.REDIS_URL || 'redis://localhost:6379',
-      dbUrl: process.env.DATABASE_URL || 'postgresql://localhost:5432/test',
+      redisUrl: process.env.REDIS_URL, // Default is handled by the getter
+      dbUrl: process.env.DATABASE_URL,   // Default is handled by the getter
       encryptionKeyEnv: 'VCU_ENCRYPTION_KEY',
-      tokenDefaultExpiry: 86400, // 24 hours
-      tokenDefaultQuota: 1000,
-      tokenDefaultRateLimit: 100
+      tokenDefaultExpiry: !isNaN(tokenDefaultExpiryEnv) ? tokenDefaultExpiryEnv : 86400, // 24 hours
+      tokenDefaultQuota: !isNaN(tokenDefaultQuotaEnv) ? tokenDefaultQuotaEnv : 1000,
+      tokenDefaultRateLimit: !isNaN(tokenDefaultRateLimitEnv) ? tokenDefaultRateLimitEnv : 100
     };
   }
 

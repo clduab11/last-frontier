@@ -4,18 +4,16 @@
  * Using London School TDD approach with comprehensive mocking
  */
 
-import axios, { AxiosInstance, AxiosResponse } from 'axios';
+import type { AxiosInstance, AxiosResponse, InternalAxiosRequestConfig } from 'axios';
+import type { ParallaxContentGenerationRequest, ParallaxContentGenerationResponse } from '../../../src/types/parallax';
 
-import { generateContent } from '../../../src/services/parallaxApiClient';
-import { getActiveVcuToken } from '../../../src/services/vcuTokenService';
-import {
-  ParallaxContentGenerationRequest,
-  ParallaxContentGenerationResponse,
-} from '../../../src/types/parallax';
-
-// Mock external dependencies
-jest.mock('axios');
-jest.mock('../../../src/services/vcuTokenService');
+/**
+ * NOTE: Do NOT mock axios or bottleneck at the top level, as this breaks integration tests.
+ * Instead, mock them only within the ParallaxApiClient unit test suite.
+ *
+ * To prevent require cache pollution, do not import axios or Bottleneck at the top level.
+ * Only import them after jest.doMock in beforeEach.
+ */
 jest.mock('../../../src/config/parallaxConfig', () => ({
   parallaxConfig: {
     apiBaseUrl: 'https://api.parallax.test',
@@ -30,10 +28,9 @@ jest.mock('../../../src/config/parallaxConfig', () => ({
   },
 }));
 
-const mockedAxios = axios as jest.Mocked<typeof axios>;
-const mockedGetActiveVcuToken = getActiveVcuToken as jest.MockedFunction<typeof getActiveVcuToken>;
-
-// Mock rate limiter interface
+/**
+ * Mock rate limiter interface for type safety in test suite.
+ */
 interface MockRateLimiter {
   schedule: jest.MockedFunction<(fn: () => Promise<unknown>) => Promise<unknown>>;
 }
@@ -41,26 +38,51 @@ interface MockRateLimiter {
 describe('ParallaxApiClient', () => {
   let mockAxiosInstance: jest.Mocked<AxiosInstance>;
   let mockLimiter: MockRateLimiter;
+  let mockedAxios: jest.Mocked<typeof import('axios')>;
+  let generateContent: typeof import('../../../src/services/parallaxApiClient').generateContent;
+  let mockedGetActiveVcuToken: jest.MockedFunction<typeof import('../../../src/services/vcuTokenService').getActiveVcuToken>;
 
   beforeEach(() => {
-    // Reset all mocks
-    jest.clearAllMocks();
+    jest.resetModules();
 
-    // Mock axios instance
-    mockAxiosInstance = {
-      request: jest.fn(),
-    } as unknown as jest.Mocked<AxiosInstance>;
-    mockedAxios.create.mockReturnValue(mockAxiosInstance);
-
-    // Mock rate limiter - simulate the bottleneck behavior
+    // Always initialize mockLimiter before mocking bottleneck to avoid undefined errors.
     mockLimiter = {
       schedule: jest.fn(),
     };
 
-    // Mock the rate limiter module by intercepting the import
+    // Dynamically mock all dependencies for this suite only
+    jest.doMock('axios');
     jest.doMock('bottleneck', () => {
       return jest.fn().mockImplementation(() => mockLimiter);
     });
+    jest.doMock('../../../src/services/vcuTokenService', () => ({
+      getActiveVcuToken: jest.fn(),
+    }));
+
+    // Import axios after mocking
+    // eslint-disable-next-line @typescript-eslint/no-var-requires
+    mockedAxios = require('axios');
+    mockAxiosInstance = {
+      request: jest.fn(),
+    } as unknown as jest.Mocked<AxiosInstance>;
+    // Directly assign the static .create method for the mock
+    // @ts-expect-error: create is not typed on the mock, but exists on the real axios
+    mockedAxios.create = jest.fn().mockReturnValue(mockAxiosInstance);
+
+    // Import VCU token service after mocking
+    // eslint-disable-next-line @typescript-eslint/no-var-requires
+    const vcuTokenService = require('../../../src/services/vcuTokenService');
+    mockedGetActiveVcuToken = vcuTokenService.getActiveVcuToken;
+
+    // Import generateContent after mocks are in place
+    // eslint-disable-next-line @typescript-eslint/no-var-requires
+    generateContent = require('../../../src/services/parallaxApiClient').generateContent;
+  });
+
+  afterEach(() => {
+    // Reset module registry to avoid leaking mocks to other tests (especially integration)
+    jest.resetModules();
+    jest.clearAllMocks();
   });
 
   describe('generateContent', () => {
@@ -93,7 +115,7 @@ describe('ParallaxApiClient', () => {
         status: 200,
         statusText: 'OK',
         headers: {},
-        config: {} as any,
+        config: {} as InternalAxiosRequestConfig,
       };
       
       mockLimiter.schedule.mockImplementation((fn: () => Promise<unknown>) => fn());
@@ -123,10 +145,20 @@ describe('ParallaxApiClient', () => {
       mockedGetActiveVcuToken.mockRejectedValue(tokenError);
 
       // When: Attempting to generate content
-      // Then: Should propagate the token error
-      await expect(generateContent(mockRequest)).rejects.toThrow('VCU token service unavailable');
+      const result = await generateContent(mockRequest);
+
+      // Then: Should return error response
       expect(mockedGetActiveVcuToken).toHaveBeenCalledTimes(1);
       expect(mockLimiter.schedule).not.toHaveBeenCalled();
+      expect(result).toEqual({
+        error: {
+          code: 'API_ERROR',
+          message: 'VCU token service unavailable',
+          details: undefined,
+          status: undefined,
+        },
+        requestId: undefined,
+      });
     });
 
     it('should retry on network timeout errors', async () => {
@@ -366,6 +398,7 @@ describe('ParallaxApiClient', () => {
     it('should create axios instance with correct configuration', () => {
       // When: Module is imported (axios.create is called)
       // Then: Should configure axios with correct settings
+      // @ts-expect-error: create is assigned on the mock for test purposes
       expect(mockedAxios.create).toHaveBeenCalledWith({
         baseURL: 'https://api.parallax.test',
         timeout: 30000,

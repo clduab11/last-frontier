@@ -20,9 +20,15 @@ Built for developers, scientists, researchers, and creative artists who refuse t
 
 ### 🧠 Unfiltered AI Capabilities
 - **Advanced Content Generation** - Leverage cutting-edge AI models for sophisticated content creation
-- **VCU Token Management** - Proprietary token system for optimized AI resource allocation
+- **Frontier Freedom Credits (FFC)** - Revolutionary tokenomics with fixed pricing and crypto integration
 - **Intelligent Analytics** - Deep insights powered by machine learning algorithms
 - **Adaptive Processing** - Dynamic AI model selection based on workload requirements
+
+### 💳 Flexible Payment Integration
+- **Traditional Payments** - Stripe and PayPal Link for seamless fiat transactions
+- **Cryptocurrency Support** - Native Coinbase and MetaMask wallet integration
+- **Hybrid Economy** - Automatic conversion between USD, FFC, and VVV tokens
+- **Instant Settlement** - Real-time balance updates and transaction processing
 
 ### 🛡️ Enterprise-Grade Security
 - **Zero-Trust Architecture** - Multi-layered security with JWT authentication and RBAC

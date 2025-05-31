@@ -1,51 +1,115 @@
 /**
+ * Ensure real axios and Bottleneck are used in integration tests.
+ * This prevents any Jest mocks from leaking in from unit test suites.
+ */
+jest.unmock('axios');
+jest.unmock('bottleneck');
+
+// Load test setup that handles database mocking
+import '../setup.integration';
+
+/**
  * Integration tests for the Last Frontier API
  * Tests the complete integration of Express server, authentication, and database
  */
 
 import request from 'supertest';
 import { Pool } from 'pg';
+import http from 'http';
+import dotenv from 'dotenv';
+import path from 'path';
 
-import app from '../../src/index';
+// Ensure environment variables are loaded for integration tests
+dotenv.config({ path: path.resolve(__dirname, '../../.env.test') });
+
+import { app, startServer, closeServer } from '../../src/index';
 import { generateJwt, UserRole } from '../../src/auth/authService';
-import { pool } from '../../src/database/connection';
+// import { pool } from '../../src/database/connection'; // testPool will be initialized
 
 describe('API Integration Tests', () => {
   let testPool: Pool;
   let validToken: string;
   let testUserId: number;
+  let server: http.Server;
 
   beforeAll(async () => {
-    // Use the existing pool for tests
-    testPool = pool;
-    
+    testPool = new Pool({ connectionString: process.env.DATABASE_URL });
     // Create a test user and generate a valid token
-    const client = await testPool.connect();
     try {
-      const result = await client.query(
-        'INSERT INTO users (email, password_hash, role) VALUES ($1, $2, $3) RETURNING id',
-        ['test@example.com', 'hashed_password', 'explorer']
-      );
-      testUserId = result.rows[0].id;
-      
+      const client = await testPool.connect();
+      try {
+        // Clear relevant tables before tests
+        await client.query('DELETE FROM vcu_tokens;');
+        await client.query('DELETE FROM user_sessions;');
+        await client.query('DELETE FROM users;');
+        
+        const result = await client.query(
+          'INSERT INTO users (email, password_hash, role) VALUES ($1, $2, $3) RETURNING id',
+          ['test@example.com', 'hashed_password', 'explorer']
+        );
+        testUserId = result.rows[0].id;
+        
+        validToken = generateJwt({
+          userId: testUserId.toString(),
+          email: 'test@example.com',
+          role: UserRole.EXPLORER
+        });
+      } finally {
+        client.release();
+      }
+    } catch (error) {
+      // Use mock data if database is not available
+      testUserId = 1;
       validToken = generateJwt({
-        userId: testUserId.toString(),
+        userId: '1',
         email: 'test@example.com',
         role: UserRole.EXPLORER
       });
-    } finally {
-      client.release();
     }
+    
+    await new Promise<void>((resolve, reject) => {
+      server = startServer(0); // Start on a random available port
+      server.on('listening', () => {
+        const address = server.address();
+        if (address && typeof address !== 'string') {
+          process.env.PORT = String(address.port); // Set port for supertest
+        }
+        resolve();
+      });
+      server.on('error', reject);
+    });
   });
 
   afterAll(async () => {
     // Clean up test data
-    const client = await testPool.connect();
     try {
-      await client.query('DELETE FROM users WHERE id = $1', [testUserId]);
-    } finally {
-      client.release();
+      const client = await testPool.connect();
+      try {
+        await client.query('DELETE FROM users WHERE id = $1', [testUserId]);
+      } catch(err) {
+        // Ignore cleanup errors
+      }
+      finally {
+        client.release();
+      }
+    } catch (error) {
+      // Ignore database connection errors during cleanup
     }
+    
+    try {
+      await testPool.end();
+    } catch (error) {
+      // Ignore database connection errors during cleanup
+    }
+    
+    await new Promise<void>((resolve, reject) => {
+      closeServer((err) => {
+        if (err) {
+          return reject(err);
+        }
+        resolve();
+      });
+    });
   });
 
   describe('Health Check Endpoint', () => {

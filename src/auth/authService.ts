@@ -1,9 +1,12 @@
 // Parallax Analytics "Last Frontier" Authentication Service
 // Handles OAuth2 (Google, GitHub), JWT, and role-based access control.
-// No hard-coded secrets; all config via environment variables.
+// Integrated with Supabase Authentication for secure user management.
 
 import jwt, { SignOptions, JwtPayload } from 'jsonwebtoken';
-import bcrypt from 'bcryptjs';
+import bcrypt from 'bcryptjs'; // Keep for backward compatibility
+import { Request, Response, NextFunction } from 'express';
+
+import { supabaseAdmin } from '../config/supabase';
 
 /**
  * User roles for Last Frontier platform.
@@ -22,6 +25,17 @@ export interface LastFrontierJwtPayload extends JwtPayload {
   userId: string;
   email: string;
   role: UserRole;
+}
+
+/**
+ * Supabase authentication result interface
+ */
+export interface SupabaseAuthResult {
+  user: {
+    id: string;
+    email?: string;
+  } | null;
+  error: Error | null;
 }
 
 /**
@@ -49,7 +63,70 @@ export function verifyJwt(token: string): LastFrontierJwtPayload {
 }
 
 /**
- * Hashes a password using bcrypt.
+ * Creates a new user using Supabase Auth
+ * @param email - User email
+ * @param password - User password
+ */
+export async function createUserWithSupabase(email: string, password: string): Promise<SupabaseAuthResult> {
+  try {
+    const { data, error } = await supabaseAdmin.auth.admin.createUser({
+      email,
+      password,
+      email_confirm: true, // Auto-confirm email for testing
+    });
+
+    if (error) {
+      return { user: null, error };
+    }
+
+    return { user: data.user, error: null };
+  } catch (error) {
+    return { user: null, error: error as Error };
+  }
+}
+
+/**
+ * Authenticate user with Supabase Auth
+ * @param email - User email
+ * @param password - User password
+ */
+export async function signInWithSupabase(email: string, password: string): Promise<SupabaseAuthResult> {
+  try {
+    const { data, error } = await supabaseAdmin.auth.signInWithPassword({
+      email,
+      password,
+    });
+
+    if (error) {
+      return { user: null, error };
+    }
+
+    return { user: data.user, error: null };
+  } catch (error) {
+    return { user: null, error: error as Error };
+  }
+}
+
+/**
+ * Get user by ID from Supabase Auth
+ * @param userId - User ID
+ */
+export async function getUserFromSupabase(userId: string): Promise<SupabaseAuthResult> {
+  try {
+    const { data, error } = await supabaseAdmin.auth.admin.getUserById(userId);
+
+    if (error) {
+      return { user: null, error };
+    }
+
+    return { user: data.user, error: null };
+  } catch (error) {
+    return { user: null, error: error as Error };
+  }
+}
+
+/**
+ * Legacy password hashing function (kept for backward compatibility with tests)
  * @param password - Plain text password
  */
 export async function hashPassword(password: string): Promise<string> {
@@ -57,7 +134,7 @@ export async function hashPassword(password: string): Promise<string> {
 }
 
 /**
- * Compares a plain password to a hash.
+ * Legacy password comparison function (kept for backward compatibility with tests)
  * @param password - Plain text password
  * @param hash - Hashed password
  */
@@ -69,17 +146,12 @@ export async function comparePassword(password: string, hash: string): Promise<b
  * Role-based access control middleware (Express.js style).
  * Usage: app.use('/admin', requireRole([UserRole.ADMIN]))
  */
-import { Request, Response, NextFunction } from 'express';
-
-/**
- * Role-based access control middleware (Express.js style).
- * Usage: app.use('/admin', requireRole([UserRole.ADMIN]))
- */
 export function requireRole(roles: UserRole[]) {
-  return (req: Request, res: Response, next: NextFunction) => {
+  return (req: Request, res: Response, next: NextFunction): void => {
     const user = req.user as LastFrontierJwtPayload;
     if (!user || !roles.includes(user.role)) {
-      return res.status(403).json({ error: 'Forbidden' });
+      res.status(403).json({ error: 'Forbidden' });
+      return;
     }
     next();
   };

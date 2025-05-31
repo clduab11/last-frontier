@@ -195,19 +195,37 @@ export function createContentGenerationService(
         return { success: true, data: cached };
       }
 
-      const apiResponse: ParallaxApiResponse = await generateContent(payload);
+      // If not cached, proceed to API call
+      try {
+        const apiResponse: ParallaxApiResponse = await generateContent(payload);
 
-      if (isSuccessResponse(apiResponse)) {
-        cache.set(cacheKey, apiResponse);
-        return { success: true, data: apiResponse };
+        if (isSuccessResponse(apiResponse)) {
+          cache.set(cacheKey, apiResponse);
+          return { success: true, data: apiResponse };
+        }
+
+        // Known API error path
+        return { success: false, error: apiResponse as ParallaxApiErrorResponse };
+      } catch (error) {
+        // Catch unexpected errors from generateContent (e.g., network issues)
+        // console.error('Unexpected error during content generation:', error); // Optional: for server-side logging
+        return {
+          success: false,
+          error: {
+            error: {
+              code: 'INTERNAL_SERVER_ERROR',
+              message:
+                error instanceof Error
+                  ? error.message
+                  : 'An unexpected error occurred during content generation.',
+              status: 500,
+            },
+          },
+        };
       }
-
-      // Error path
-      return { success: false, error: apiResponse };
-    },
-  };
-}
-
+    }, // This comma correctly closes the 'generate' method property in the object
+    };
+  }
 // Default singleton instance
 const defaultService = createContentGenerationService();
 export default defaultService;
